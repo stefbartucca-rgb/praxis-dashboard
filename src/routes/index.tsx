@@ -17,7 +17,9 @@ import {
 } from "recharts";
 import {
   Activity,
+  Award,
   CalendarCheck,
+  CalendarDays,
   Clock,
   Gauge,
   Info,
@@ -141,6 +143,9 @@ function Index() {
       ? (kpis.geleisteteMinuten / capacity.totalMinutes) * 100
       : 0;
 
+  const topTreatment = byTreatment[0];
+  const topWeekday = [...byWeekday].sort((a, b) => b.count - a.count)[0];
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
@@ -210,25 +215,12 @@ function Index() {
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           <KpiCard
             label="Gesamttermine"
             value={kpis.total.toString()}
             hint={`${kpis.wahrgenommen} wahrgenommen`}
             icon={<CalendarCheck className="h-5 w-5" />}
-            tone="primary"
-          />
-          <KpiCard
-            label="Auslastung"
-            value={`${auslastung.toFixed(1)}%`}
-            hint={
-              capacity
-                ? `${Math.round(kpis.geleisteteMinuten / 60)}h von ${Math.round(
-                    capacity.totalMinutes / 60,
-                  )}h Kapazität`
-                : "—"
-            }
-            icon={<Gauge className="h-5 w-5" />}
             tone="primary"
           />
           <KpiCard
@@ -239,15 +231,44 @@ function Index() {
             tone="destructive"
           />
           <KpiCard
+            label="Häufigste Behandlung"
+            value={topTreatment ? topTreatment.name : "—"}
+            hint={topTreatment ? `${topTreatment.value} Termine` : "Keine Daten"}
+            icon={<Award className="h-5 w-5" />}
+            tone="success"
+            compactValue
+          />
+          <KpiCard
+            label="Top-Wochentag"
+            value={topWeekday ? topWeekday.full : "—"}
+            hint={topWeekday ? `${topWeekday.count} Termine` : "Keine Daten"}
+            icon={<CalendarDays className="h-5 w-5" />}
+            tone="primary"
+            compactValue
+          />
+          <KpiCard
+            label="Ø Auslastung"
+            value={`${auslastung.toFixed(1)}%`}
+            hint={
+              capacity
+                ? `${Math.round(kpis.geleisteteMinuten / 60)}h / ${Math.round(
+                    capacity.totalMinutes / 60,
+                  )}h Kapazität`
+                : "—"
+            }
+            icon={<Gauge className="h-5 w-5" />}
+            tone="primary"
+          />
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
             label="Stornoquote"
             value={`${kpis.cancellationRate.toFixed(1)}%`}
             hint={`${kpis.abgesagt} abgesagte Termine`}
             icon={<TrendingDown className="h-5 w-5" />}
             tone="warning"
           />
-        </div>
-
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard
             label="Ø Behandlungsdauer"
             value={`${kpis.durchschnittDauer.toFixed(0)} min`}
@@ -268,13 +289,6 @@ function Index() {
             hint="Summe wahrgenommener Termine"
             icon={<Activity className="h-5 w-5" />}
             tone="primary"
-          />
-          <KpiCard
-            label="Ohne Status"
-            value={kpis.unbekannt.toString()}
-            hint="Datenqualitäts-Hinweis"
-            icon={<Info className="h-5 w-5" />}
-            tone="warning"
           />
         </div>
 
@@ -544,12 +558,14 @@ function KpiCard({
   hint,
   icon,
   tone,
+  compactValue,
 }: {
   label: string;
   value: string;
   hint: string;
   icon: React.ReactNode;
   tone: "primary" | "success" | "destructive" | "warning";
+  compactValue?: boolean;
 }) {
   const toneMap: Record<typeof tone, string> = {
     primary: "bg-primary/10 text-primary",
@@ -563,7 +579,11 @@ function KpiCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
+            <p
+              className={`mt-1 font-semibold tracking-tight text-foreground ${
+                compactValue ? "text-lg leading-snug" : "text-3xl"
+              }`}
+            >
               {value}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
