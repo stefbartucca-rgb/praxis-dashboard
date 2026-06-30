@@ -20,7 +20,7 @@ Das Dashboard soll es einer Arztpraxis ermöglichen, innerhalb weniger Sekunden 
 
 ## 🚀 Live Demo
 
-[https://praxisdahsboard.netlify.app](https://praxisdahsboard.netlify.app)
+https://praxisdahsboard.netlify.app
 
 ---
 
@@ -51,17 +51,25 @@ Der Fokus liegt auf:
 
 Dieses Projekt wurde bewusst mit modernen KI-Tools entwickelt, um einen realistischen Arbeitsworkflow abzubilden.
 
-### Eingesetzte Tools:
-- Lovable (UI-Generierung & Grundstruktur)
-- ChatGPT (Konzept, Kennzahlen, Validierung)
+### Eingesetzte Tools
 
-### Vorgehen:
-- Erstellung einer ersten Dashboard-Struktur mit KI-Unterstützung
-- Iterative Verbesserung der Visualisierungen
+- Lovable (UI-Generierung & Grundstruktur)
+- ChatGPT (Konzept, Kennzahlen, Validierung sowie technische Unterstützung)
+
+### Vorgehen
+
+- Analyse der bereitgestellten JSON-Datei und der enthaltenen Datenstruktur
+- Definition sinnvoller Kennzahlen aus Sicht einer Arztpraxis
+- Erstellung einer ersten Dashboard-Struktur mit Lovable
+- Schrittweise Erweiterung der Visualisierungen und KPIs
 - Kritische Prüfung und Anpassung aller KI-generierten Inhalte
 - Eigenständige Entscheidung über KPIs, Layout und Datenstruktur
+- Lokales Testen der Anwendung
+- Erstellung eines Produktions-Builds
+- Anpassung der Build- und Deployment-Konfiguration
+- Veröffentlichung des Projekts über GitHub und Netlify
 
-KI wurde dabei als **Entwicklungswerkzeug**, nicht als vollständige Lösung genutzt.
+Die KI wurde dabei bewusst als **Entwicklungswerkzeug** eingesetzt und nicht als vollständige Lösung. Architektur, Kennzahlen, Layout sowie finale Entscheidungen wurden eigenständig getroffen.
 
 ---
 
@@ -86,13 +94,34 @@ Ziel war eine klare, funktionale und verständliche Lösung innerhalb kurzer Ent
 
 ---
 
+## 🔍 Eigene Anpassungen
+
+Neben der von der KI generierten Grundstruktur wurden verschiedene Bereiche bewusst selbst angepasst und erweitert.
+
+Dazu gehörten unter anderem:
+
+- Auswahl und Optimierung der Diagrammtypen
+- Erweiterung der KPI-Karten
+- Verbesserung der Dashboard-Struktur
+- Anpassung von Texten und Beschriftungen
+- Lokales Testen und Beheben kleinerer Fehler
+- Erstellung der Produktions-Builds
+- Eigenständige Anpassung der Build- und Deployment-Konfiguration für Netlify
+
+Dadurch entstand nicht lediglich eine KI-generierte Anwendung, sondern ein aktiv weiterentwickeltes und überarbeitetes Dashboard.
+
+---
+
 ## 🔧 Tech Stack
 
 - React
 - TypeScript
-- Charting Library (z. B. Recharts)
+- Recharts
+- Tailwind CSS
 - Lovable (KI-gestützte Entwicklung)
+- ChatGPT
 - JSON-basierte Datenquelle
+- Netlify (Deployment)
 
 ---
 
@@ -101,3 +130,38 @@ Ziel war eine klare, funktionale und verständliche Lösung innerhalb kurzer Ent
 ```bash
 npm install
 npm run dev
+```
+
+Anschließend ist die Anwendung unter der von Vite ausgegebenen lokalen Adresse erreichbar.
+
+Für einen Produktions-Build:
+
+```bash
+npm run build
+```
+
+---
+
+## 🌐 Deployment
+
+Nach erfolgreichem Testen der Anwendung wurde ein Produktions-Build erstellt.
+
+Der Quellcode wurde anschließend in ein GitHub-Repository übertragen und über Netlify veröffentlicht.
+
+Da das von Lovable erzeugte Projekt nicht direkt mit der Standardkonfiguration von Netlify kompatibel war, wurde die Build- und Publish-Konfiguration entsprechend angepasst, sodass die Anwendung erfolgreich deployed werden konnte.
+
+---
+
+## 🔐 Datenschutz
+
+Für dieses Projekt wurden ausschließlich synthetische Beispieldaten verwendet.
+
+Für eine produktive Anwendung würde ich personenbezogene Patientendaten nicht direkt im Frontend verarbeiten. Stattdessen würde ein Backend ausschließlich aggregierte und anonymisierte Kennzahlen bereitstellen. Dadurch würden keine sensiblen Gesundheitsdaten im Browser verarbeitet und datenschutzrechtliche Anforderungen besser berücksichtigt.
+
+---
+
+## 💡 Learnings
+
+Während der Umsetzung konnte ich den kompletten Entwicklungsprozess begleiten – von der Analyse der Daten über die KI-gestützte Entwicklung bis hin zum erfolgreichen Deployment.
+
+Besonders interessant war für mich die Kombination aus eigenständigen Architekturentscheidungen und der Unterstützung durch KI. Dabei hat sich gezeigt, dass KI den Entwicklungsprozess deutlich beschleunigen kann, die Verantwortung für technische Entscheidungen, Code-Qualität und Problemlösung jedoch weiterhin beim Entwickler liegt.
