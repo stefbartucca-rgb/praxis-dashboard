@@ -1,4 +1,4 @@
-# 🏥 Doctor Practice Dashboard
+# 🏥 Arztpraxis Dashboard
 
 Ein modernes, KI-gestütztes Dashboard zur Visualisierung von Terminauslastung und Praxiskennzahlen für eine Arztpraxis.  
 Die Anwendung basiert auf synthetischen Termindaten und wurde im Rahmen einer Vibe-Coding-Aufgabe entwickelt.
