@@ -648,7 +648,7 @@ function KpiCard({
       }`}
     >
       <div className="mb-3 flex items-start justify-between gap-3">
-        <span className={`text-[11px] font-bold uppercase tracking-wider ${accentMap.label}`}>
+        <span className={`text-[11px] font-medium uppercase tracking-[0.14em] ${accentMap.label}`}>
           {label}
         </span>
         <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${accentMap.chip}`}>
@@ -658,8 +658,8 @@ function KpiCard({
       <div className="flex items-end justify-between gap-3">
         <div className="min-w-0">
           <h3
-            className={`font-extrabold tracking-tight text-foreground ${
-              compactValue ? "truncate text-xl leading-tight" : "text-3xl"
+            className={`font-semibold tracking-tight text-foreground ${
+              compactValue ? "truncate text-lg leading-tight" : "text-[28px] leading-none"
             }`}
             title={compactValue ? value : undefined}
           >
