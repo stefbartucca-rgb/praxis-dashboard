@@ -313,8 +313,10 @@ function Index() {
                     <YAxis stroke="var(--color-muted-foreground)" fontSize={12} allowDecimals={false} />
                     <Tooltip
                       contentStyle={tooltipStyle}
-                      labelFormatter={(_, p) => p?.[0]?.payload?.full ?? ""}
-                      formatter={(v: number, n) => [v, n === "count" ? "Termine" : n]}
+                      labelFormatter={(_label, p) =>
+                        (p?.[0]?.payload as { full?: string } | undefined)?.full ?? ""
+                      }
+                      formatter={(v, n) => [v as number, n === "count" ? "Termine" : (n as string)]}
                     />
                     <Bar dataKey="count" fill="var(--color-primary)" radius={[6, 6, 0, 0]} />
                   </BarChart>
