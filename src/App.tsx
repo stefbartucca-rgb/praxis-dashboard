@@ -1,4 +1,3 @@
-import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import {
   Bar,
@@ -65,26 +64,7 @@ import {
   type Trend,
 } from "@/lib/appointments";
 
-export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Praxis Dashboard — Terminanalyse & Auslastung" },
-      {
-        name: "description",
-        content:
-          "Analyse der Termine einer Hausarztpraxis: Auslastung, No-Show-Quote, Behandlungsarten und Stoßzeiten.",
-      },
-      { property: "og:title", content: "Praxis Dashboard" },
-      {
-        property: "og:description",
-        content: "Auslastungs- und Terminanalyse für eine Hausarztpraxis.",
-      },
-    ],
-  }),
-  component: Index,
-});
-
-function Index() {
+export default function App() {
   const [data, setData] = useState<PraxisData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [doctor, setDoctor] = useState<string>("all");
