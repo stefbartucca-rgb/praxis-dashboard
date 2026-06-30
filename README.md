@@ -20,8 +20,7 @@ Das Dashboard soll es einer Arztpraxis ermöglichen, innerhalb weniger Sekunden 
 
 ## 🚀 Live Demo
 
-👉 *Hier einfügen, falls deployed (Vercel / Netlify)*  
-https://your-live-demo-link.com
+https://praxisdahsboard.netlify.app
 
 ---
 
