@@ -702,9 +702,9 @@ function renderTrendChip(
   );
 }
 
-function Sparkline({ values, color }: { values: number[]; color: string }) {
-  const w = 96;
-  const h = 36;
+function Sparkline({ values, color, wide }: { values: number[]; color: string; wide?: boolean }) {
+  const w = wide ? 240 : 96;
+  const h = wide ? 28 : 36;
   const max = Math.max(...values, 1);
   const min = Math.min(...values, 0);
   const range = max - min || 1;
@@ -718,7 +718,7 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
   const area = `${line} L ${w},${h} L 0,${h} Z`;
   const gradId = `g-${color.replace("#", "")}`;
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="h-10 w-24 shrink-0">
+    <svg viewBox={`0 0 ${w} ${h}`} className={wide ? "h-8 w-full" : "h-10 w-24 shrink-0"} preserveAspectRatio="none">
       <defs>
         <linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.25" />
