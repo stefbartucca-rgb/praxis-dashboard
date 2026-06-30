@@ -6,6 +6,8 @@ import {
   CartesianGrid,
   Cell,
   Legend,
+  Line,
+  LineChart,
   Pie,
   PieChart,
   ResponsiveContainer,
@@ -13,7 +15,17 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Activity, CalendarCheck, TrendingDown, UserX } from "lucide-react";
+import {
+  Activity,
+  CalendarCheck,
+  Clock,
+  Gauge,
+  Info,
+  Stethoscope,
+  TrendingDown,
+  UserPlus,
+  UserX,
+} from "lucide-react";
 import {
   Card,
   CardContent,
@@ -30,70 +42,104 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
+  computeCapacity,
   computeKpis,
+  groupByDoctor,
+  groupByHour,
   groupByStatus,
   groupByTreatment,
   groupByWeekday,
-  STATUS_DE,
+  normalize,
+  STATUS_COLOR_VAR,
+  STATUS_LABEL,
   type Appointment,
+  type NormStatus,
+  type PraxisData,
 } from "@/lib/appointments";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Praxis Dashboard — Terminanalyse" },
-      { name: "description", content: "Übersicht über Termine, No-Show-Quote und Behandlungsarten der Arztpraxis." },
+      { title: "Praxis Dashboard — Terminanalyse & Auslastung" },
+      {
+        name: "description",
+        content:
+          "Analyse der Termine einer Hausarztpraxis: Auslastung, No-Show-Quote, Behandlungsarten und Stoßzeiten.",
+      },
       { property: "og:title", content: "Praxis Dashboard" },
-      { property: "og:description", content: "Terminanalyse-Dashboard für Arztpraxen." },
+      {
+        property: "og:description",
+        content: "Auslastungs- und Terminanalyse für eine Hausarztpraxis.",
+      },
     ],
   }),
   component: Index,
 });
 
 function Index() {
-  const [data, setData] = useState<Appointment[] | null>(null);
+  const [data, setData] = useState<PraxisData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [doctor, setDoctor] = useState<string>("all");
   const [treatment, setTreatment] = useState<string>("all");
 
   useEffect(() => {
-    fetch("/appointments.json")
+    fetch("/termindaten.json")
       .then((r) => {
-        if (!r.ok) throw new Error("Fehler beim Laden");
+        if (!r.ok) throw new Error("Datei nicht gefunden");
         return r.json();
       })
-      .then((d: Appointment[]) => setData(d))
+      .then((d: PraxisData) => setData(d))
       .catch((e: Error) => setError(e.message));
   }, []);
 
-  const doctors = useMemo(
-    () => (data ? Array.from(new Set(data.map((a) => a.doctor))).sort() : []),
-    [data],
-  );
-  const treatments = useMemo(
-    () => (data ? Array.from(new Set(data.map((a) => a.treatment))).sort() : []),
+  const all: Appointment[] = useMemo(
+    () => (data ? normalize(data.termine) : []),
     [data],
   );
 
-  const filtered = useMemo(() => {
-    if (!data) return [];
-    return data.filter(
-      (a) =>
-        (doctor === "all" || a.doctor === doctor) &&
-        (treatment === "all" || a.treatment === treatment),
-    );
-  }, [data, doctor, treatment]);
+  const doctors = useMemo(
+    () => Array.from(new Set(all.map((a) => a.arzt))).sort(),
+    [all],
+  );
+  const treatments = useMemo(
+    () => Array.from(new Set(all.map((a) => a.behandlungsart))).sort(),
+    [all],
+  );
+
+  const filtered = useMemo(
+    () =>
+      all.filter(
+        (a) =>
+          (doctor === "all" || a.arzt === doctor) &&
+          (treatment === "all" || a.behandlungsart === treatment),
+      ),
+    [all, doctor, treatment],
+  );
 
   const kpis = useMemo(() => computeKpis(filtered), [filtered]);
   const byWeekday = useMemo(() => groupByWeekday(filtered), [filtered]);
+  const byHour = useMemo(() => groupByHour(filtered), [filtered]);
   const byTreatment = useMemo(() => groupByTreatment(filtered), [filtered]);
   const byStatus = useMemo(() => groupByStatus(filtered), [filtered]);
+  const byDoctor = useMemo(() => groupByDoctor(filtered), [filtered]);
 
-  const statusColors: Record<string, string> = {
-    completed: "var(--color-success)",
-    no_show: "var(--color-destructive)",
-    cancelled: "var(--color-warning)",
-  };
+  // Auslastung bezieht sich immer auf die berücksichtigten Ärzte im Filter.
+  const capacityDoctors = doctor === "all" ? doctors.length : 1;
+  const capacity = useMemo(
+    () =>
+      data
+        ? computeCapacity(
+            data.zeitraum.von,
+            data.zeitraum.bis,
+            Math.max(capacityDoctors, 1),
+          )
+        : null,
+    [data, capacityDoctors],
+  );
+  const auslastung =
+    capacity && capacity.totalMinutes > 0
+      ? (kpis.geleisteteMinuten / capacity.totalMinutes) * 100
+      : 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -104,20 +150,25 @@ function Index() {
               className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-primary-foreground"
               style={{ background: "var(--gradient-primary)" }}
             >
-              <Activity className="h-6 w-6" />
+              <Stethoscope className="h-6 w-6" />
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
                 Praxis Dashboard
               </h1>
               <p className="truncate text-sm text-muted-foreground">
-                Terminanalyse &amp; Auslastung
+                {data?.praxis ?? "Terminanalyse & Auslastung"}
               </p>
             </div>
           </div>
-          <Badge variant="secondary" className="self-start sm:self-auto">
-            {filtered.length} Termine im Zeitraum
-          </Badge>
+          {data && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">
+                Zeitraum {formatDate(data.zeitraum.von)} – {formatDate(data.zeitraum.bis)}
+              </Badge>
+              <Badge variant="outline">{filtered.length} Termine</Badge>
+            </div>
+          )}
         </div>
       </header>
 
@@ -137,7 +188,9 @@ function Index() {
             <SelectContent>
               <SelectItem value="all">Alle Ärzte</SelectItem>
               {doctors.map((d) => (
-                <SelectItem key={d} value={d}>{d}</SelectItem>
+                <SelectItem key={d} value={d}>
+                  {d}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -148,7 +201,9 @@ function Index() {
             <SelectContent>
               <SelectItem value="all">Alle Behandlungen</SelectItem>
               {treatments.map((t) => (
-                <SelectItem key={t} value={t}>{t}</SelectItem>
+                <SelectItem key={t} value={t}>
+                  {t}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -159,39 +214,95 @@ function Index() {
           <KpiCard
             label="Gesamttermine"
             value={kpis.total.toString()}
-            hint="Im aktuellen Filter"
+            hint={`${kpis.wahrgenommen} wahrgenommen`}
             icon={<CalendarCheck className="h-5 w-5" />}
             tone="primary"
           />
           <KpiCard
-            label="Abgeschlossen"
-            value={`${kpis.completionRate.toFixed(1)}%`}
-            hint={`${kpis.completed} Termine`}
-            icon={<Activity className="h-5 w-5" />}
-            tone="success"
+            label="Auslastung"
+            value={`${auslastung.toFixed(1)}%`}
+            hint={
+              capacity
+                ? `${Math.round(kpis.geleisteteMinuten / 60)}h von ${Math.round(
+                    capacity.totalMinutes / 60,
+                  )}h Kapazität`
+                : "—"
+            }
+            icon={<Gauge className="h-5 w-5" />}
+            tone="primary"
           />
           <KpiCard
             label="No-Show-Quote"
             value={`${kpis.noShowRate.toFixed(1)}%`}
-            hint={`${kpis.noShows} verpasste Termine`}
+            hint={`${kpis.noShow} unentschuldigt verpasst`}
             icon={<UserX className="h-5 w-5" />}
             tone="destructive"
           />
           <KpiCard
-            label="Stornierungen"
-            value={kpis.cancelled.toString()}
-            hint="Im aktuellen Filter"
+            label="Stornoquote"
+            value={`${kpis.cancellationRate.toFixed(1)}%`}
+            hint={`${kpis.abgesagt} abgesagte Termine`}
             icon={<TrendingDown className="h-5 w-5" />}
             tone="warning"
           />
         </div>
 
-        {/* Charts */}
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            label="Ø Behandlungsdauer"
+            value={`${kpis.durchschnittDauer.toFixed(0)} min`}
+            hint="je wahrgenommenem Termin"
+            icon={<Clock className="h-5 w-5" />}
+            tone="success"
+          />
+          <KpiCard
+            label="Neupatienten-Anteil"
+            value={`${kpis.neupatientenAnteil.toFixed(1)}%`}
+            hint="aller Termine im Filter"
+            icon={<UserPlus className="h-5 w-5" />}
+            tone="success"
+          />
+          <KpiCard
+            label="Geleistete Stunden"
+            value={`${(kpis.geleisteteMinuten / 60).toFixed(1)} h`}
+            hint="Summe wahrgenommener Termine"
+            icon={<Activity className="h-5 w-5" />}
+            tone="primary"
+          />
+          <KpiCard
+            label="Ohne Status"
+            value={kpis.unbekannt.toString()}
+            hint="Datenqualitäts-Hinweis"
+            icon={<Info className="h-5 w-5" />}
+            tone="warning"
+          />
+        </div>
+
+        {/* Auslastungs-Erklärung */}
+        <Card className="mt-6 border-primary/20 bg-primary/5">
+          <CardContent className="flex flex-col gap-2 py-4 text-sm sm:flex-row sm:items-start sm:gap-3">
+            <Info className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+            <div className="text-foreground">
+              <p className="font-medium">Wie wird die Auslastung berechnet?</p>
+              <p className="mt-1 text-muted-foreground">
+                Auslastung = <em>geleistete Behandlungsminuten</em> (Summe der
+                wahrgenommenen Termine) geteilt durch die <em>verfügbare
+                Kapazität</em>. Die Kapazität entspricht den Werktagen (Mo–Fr) im
+                Zeitraum × 9 Sprechstunden pro Tag (08–18 Uhr abzüglich
+                Mittagspause) × {capacityDoctors} {capacityDoctors === 1 ? "Arzt" : "Ärzte"}
+                {capacity ? ` = ${Math.round(capacity.totalMinutes / 60)} Stunden Kapazität` : ""}.
+                {data?.oeffnungszeiten_hinweis ? ` Sprechzeiten: ${data.oeffnungszeiten_hinweis}.` : ""}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Charts row 1 */}
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Termine pro Wochentag</CardTitle>
-              <CardDescription>Verteilung der Termine über die Woche</CardDescription>
+              <CardDescription>Anzahl Termine je Werktag im Zeitraum</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-72">
@@ -201,12 +312,11 @@ function Index() {
                     <XAxis dataKey="day" stroke="var(--color-muted-foreground)" fontSize={12} />
                     <YAxis stroke="var(--color-muted-foreground)" fontSize={12} allowDecimals={false} />
                     <Tooltip
-                      contentStyle={{
-                        background: "var(--color-card)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
+                      contentStyle={tooltipStyle}
+                      labelFormatter={(_label, p) =>
+                        (p?.[0]?.payload as { full?: string } | undefined)?.full ?? ""
+                      }
+                      formatter={(v, n) => [v as number, n === "count" ? "Termine" : (n as string)]}
                     />
                     <Bar dataKey="count" fill="var(--color-primary)" radius={[6, 6, 0, 0]} />
                   </BarChart>
@@ -218,7 +328,7 @@ function Index() {
           <Card>
             <CardHeader>
               <CardTitle>Status-Verteilung</CardTitle>
-              <CardDescription>Abgeschlossen vs. No-Show vs. Storno</CardDescription>
+              <CardDescription>Wahrgenommen, No-Show, Absage</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-72">
@@ -233,17 +343,10 @@ function Index() {
                       paddingAngle={2}
                     >
                       {byStatus.map((entry) => (
-                        <Cell key={entry.status} fill={statusColors[entry.status]} />
+                        <Cell key={entry.status} fill={STATUS_COLOR_VAR[entry.status]} />
                       ))}
                     </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        background: "var(--color-card)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
-                    />
+                    <Tooltip contentStyle={tooltipStyle} />
                     <Legend wrapperStyle={{ fontSize: 12 }} />
                   </PieChart>
                 </ResponsiveContainer>
@@ -252,30 +355,110 @@ function Index() {
           </Card>
         </div>
 
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <Card>
+        {/* Charts row 2 */}
+        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <Card className="lg:col-span-2">
             <CardHeader>
-              <CardTitle>Häufigste Behandlungsarten</CardTitle>
-              <CardDescription>Top-Behandlungen im Zeitraum</CardDescription>
+              <CardTitle>Stoßzeiten im Tagesverlauf</CardTitle>
+              <CardDescription>
+                Wahrgenommene Termine je Stunde (08–18 Uhr)
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={byTreatment} layout="vertical" margin={{ top: 10, right: 20, bottom: 0, left: 10 }}>
+                  <LineChart data={byHour} margin={{ top: 10, right: 10, bottom: 0, left: -20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+                    <XAxis dataKey="hour" stroke="var(--color-muted-foreground)" fontSize={12} />
+                    <YAxis stroke="var(--color-muted-foreground)" fontSize={12} allowDecimals={false} />
+                    <Tooltip contentStyle={tooltipStyle} />
+                    <Line
+                      type="monotone"
+                      dataKey="count"
+                      stroke="var(--color-primary)"
+                      strokeWidth={2}
+                      dot={{ r: 3 }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Behandlungsarten</CardTitle>
+              <CardDescription>Häufigkeit im Zeitraum</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={byTreatment}
+                    layout="vertical"
+                    margin={{ top: 10, right: 16, bottom: 0, left: 10 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
                     <XAxis type="number" stroke="var(--color-muted-foreground)" fontSize={12} allowDecimals={false} />
-                    <YAxis type="category" dataKey="name" stroke="var(--color-muted-foreground)" fontSize={12} width={110} />
-                    <Tooltip
-                      contentStyle={{
-                        background: "var(--color-card)",
-                        border: "1px solid var(--color-border)",
-                        borderRadius: 8,
-                        fontSize: 12,
-                      }}
+                    <YAxis
+                      type="category"
+                      dataKey="name"
+                      stroke="var(--color-muted-foreground)"
+                      fontSize={11}
+                      width={130}
                     />
+                    <Tooltip contentStyle={tooltipStyle} />
                     <Bar dataKey="value" fill="var(--color-accent)" radius={[0, 6, 6, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Doctor breakdown + table */}
+        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Auslastung je Arzt</CardTitle>
+              <CardDescription>
+                Termine, geleistete Stunden und No-Show-Quote
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-hidden rounded-lg border border-border">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/60 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                    <tr>
+                      <th className="px-3 py-2">Arzt</th>
+                      <th className="px-3 py-2 text-right">Termine</th>
+                      <th className="px-3 py-2 text-right">Stunden</th>
+                      <th className="px-3 py-2 text-right">No-Show</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {byDoctor.map((d) => (
+                      <tr key={d.name} className="border-t border-border">
+                        <td className="px-3 py-2 font-medium text-foreground">{d.name}</td>
+                        <td className="px-3 py-2 text-right text-foreground">{d.count}</td>
+                        <td className="px-3 py-2 text-right text-foreground">
+                          {(d.minutes / 60).toFixed(1)} h
+                        </td>
+                        <td className="px-3 py-2 text-right text-muted-foreground">
+                          {d.noShowRate.toFixed(1)}%
+                        </td>
+                      </tr>
+                    ))}
+                    {byDoctor.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-3 py-6 text-center text-muted-foreground">
+                          Keine Daten
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>
@@ -298,19 +481,24 @@ function Index() {
                   </thead>
                   <tbody>
                     {[...filtered]
-                      .sort((a, b) => b.date.localeCompare(a.date))
+                      .sort((a, b) => b.dateObj.getTime() - a.dateObj.getTime())
                       .slice(0, 8)
                       .map((a) => (
-                        <tr key={a.id} className="border-t border-border">
+                        <tr key={a.termin_id} className="border-t border-border">
                           <td className="px-3 py-2 text-foreground">
-                            {new Date(a.date).toLocaleDateString("de-DE", {
+                            {a.dateObj.toLocaleDateString("de-DE", {
                               day: "2-digit",
                               month: "2-digit",
-                              year: "numeric",
-                            })}
+                            })}{" "}
+                            <span className="text-muted-foreground">
+                              {a.dateObj.toLocaleTimeString("de-DE", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
                           </td>
-                          <td className="px-3 py-2 text-foreground">{a.treatment}</td>
-                          <td className="px-3 py-2 text-muted-foreground">{a.doctor}</td>
+                          <td className="px-3 py-2 text-foreground">{a.behandlungsart}</td>
+                          <td className="px-3 py-2 text-muted-foreground">{a.arzt}</td>
                           <td className="px-3 py-2">
                             <StatusPill status={a.status} />
                           </td>
@@ -332,6 +520,22 @@ function Index() {
       </main>
     </div>
   );
+}
+
+const tooltipStyle = {
+  background: "var(--color-card)",
+  border: "1px solid var(--color-border)",
+  borderRadius: 8,
+  fontSize: 12,
+} as const;
+
+function formatDate(iso: string) {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("de-DE", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 function KpiCard({
@@ -359,7 +563,9 @@ function KpiCard({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm text-muted-foreground">{label}</p>
-            <p className="mt-1 text-3xl font-semibold tracking-tight text-foreground">{value}</p>
+            <p className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
+              {value}
+            </p>
             <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
           </div>
           <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${toneMap[tone]}`}>
@@ -371,15 +577,16 @@ function KpiCard({
   );
 }
 
-function StatusPill({ status }: { status: "completed" | "no_show" | "cancelled" }) {
-  const map = {
-    completed: "bg-success/15 text-success",
+function StatusPill({ status }: { status: NormStatus }) {
+  const map: Record<NormStatus, string> = {
+    wahrgenommen: "bg-success/15 text-success",
     no_show: "bg-destructive/15 text-destructive",
-    cancelled: "bg-warning/20 text-warning",
-  } as const;
+    abgesagt: "bg-warning/20 text-warning",
+    unbekannt: "bg-muted text-muted-foreground",
+  };
   return (
     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${map[status]}`}>
-      {STATUS_DE[status]}
+      {STATUS_LABEL[status]}
     </span>
   );
 }
