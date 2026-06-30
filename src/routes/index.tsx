@@ -670,10 +670,15 @@ function KpiCard({
           )}
           {trendChip}
         </div>
-        {spark && spark.length > 1 && (
+        {spark && spark.length > 1 && !compactValue && (
           <Sparkline values={spark} color={accentMap.spark} />
         )}
       </div>
+      {spark && spark.length > 1 && compactValue && (
+        <div className="mt-3 -mx-1">
+          <Sparkline values={spark} color={accentMap.spark} wide />
+        </div>
+      )}
     </div>
   );
 }
