@@ -46,6 +46,11 @@ import { Badge } from "@/components/ui/badge";
 import {
   computeCapacity,
   computeKpis,
+  computeAuslastungTrend,
+  computeNoShowTrend,
+  computeTotalTrend,
+  dailyNoShowRate,
+  dailySeries,
   groupByDoctor,
   groupByHour,
   groupByStatus,
@@ -57,6 +62,7 @@ import {
   type Appointment,
   type NormStatus,
   type PraxisData,
+  type Trend,
 } from "@/lib/appointments";
 
 export const Route = createFileRoute("/")({
@@ -146,6 +152,41 @@ function Index() {
   const topTreatment = byTreatment[0];
   const topWeekday = [...byWeekday].sort((a, b) => b.count - a.count)[0];
 
+  // Trends (1. vs. 2. Hälfte des Zeitraums) + Sparkline-Reihen
+  const totalTrend = useMemo<Trend | null>(
+    () => (data ? computeTotalTrend(filtered, data.zeitraum.von, data.zeitraum.bis) : null),
+    [filtered, data],
+  );
+  const noShowTrend = useMemo<Trend | null>(
+    () => (data ? computeNoShowTrend(filtered, data.zeitraum.von, data.zeitraum.bis) : null),
+    [filtered, data],
+  );
+  const auslTrend = useMemo<Trend | null>(
+    () =>
+      data
+        ? computeAuslastungTrend(
+            filtered,
+            data.zeitraum.von,
+            data.zeitraum.bis,
+            Math.max(capacityDoctors, 1),
+          )
+        : null,
+    [filtered, data, capacityDoctors],
+  );
+  const totalSpark = useMemo(
+    () => (data ? dailySeries(filtered, data.zeitraum.von, data.zeitraum.bis) : []),
+    [filtered, data],
+  );
+  const noShowSpark = useMemo(
+    () => (data ? dailyNoShowRate(filtered, data.zeitraum.von, data.zeitraum.bis) : []),
+    [filtered, data],
+  );
+  const weekdaySpark = useMemo(() => byWeekday.map((d) => d.count), [byWeekday]);
+  const treatmentSpark = useMemo(
+    () => byTreatment.slice(0, 8).map((t) => t.value),
+    [byTreatment],
+  );
+
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border bg-card">
@@ -219,45 +260,60 @@ function Index() {
           <KpiCard
             label="Gesamttermine"
             value={kpis.total.toString()}
-            hint={`${kpis.wahrgenommen} wahrgenommen`}
             icon={<CalendarCheck className="h-5 w-5" />}
-            tone="primary"
+            accent="blue"
+            trend={totalTrend ? { ...totalTrend, suffix: " Termine", goodWhen: "up" } : null}
+            spark={totalSpark}
           />
           <KpiCard
             label="No-Show-Quote"
             value={`${kpis.noShowRate.toFixed(1)}%`}
-            hint={`${kpis.noShow} unentschuldigt verpasst`}
             icon={<UserX className="h-5 w-5" />}
-            tone="destructive"
+            accent="rose"
+            alert={kpis.noShowRate >= 8}
+            trend={
+              noShowTrend
+                ? { ...noShowTrend, suffix: " %-Pkt.", goodWhen: "down", asAbsolute: true }
+                : null
+            }
+            spark={noShowSpark}
           />
           <KpiCard
             label="Häufigste Behandlung"
             value={topTreatment ? topTreatment.name : "—"}
-            hint={topTreatment ? `${topTreatment.value} Termine` : "Keine Daten"}
+            secondary={topTreatment ? `${topTreatment.value} Termine` : "Keine Daten"}
             icon={<Award className="h-5 w-5" />}
-            tone="success"
+            accent="emerald"
             compactValue
+            spark={treatmentSpark}
           />
           <KpiCard
             label="Top-Wochentag"
             value={topWeekday ? topWeekday.full : "—"}
-            hint={topWeekday ? `${topWeekday.count} Termine` : "Keine Daten"}
+            secondary={topWeekday ? `${topWeekday.count} Termine` : "Keine Daten"}
             icon={<CalendarDays className="h-5 w-5" />}
-            tone="primary"
+            accent="amber"
             compactValue
+            spark={weekdaySpark}
           />
           <KpiCard
             label="Ø Auslastung"
             value={`${auslastung.toFixed(1)}%`}
-            hint={
+            secondary={
               capacity
                 ? `${Math.round(kpis.geleisteteMinuten / 60)}h / ${Math.round(
                     capacity.totalMinutes / 60,
-                  )}h Kapazität`
+                  )}h`
                 : "—"
             }
             icon={<Gauge className="h-5 w-5" />}
-            tone="primary"
+            accent="indigo"
+            alert={auslastung >= 90}
+            trend={
+              auslTrend
+                ? { ...auslTrend, suffix: " %-Pkt.", goodWhen: "up", asAbsolute: true }
+                : null
+            }
           />
         </div>
 
@@ -555,45 +611,118 @@ function formatDate(iso: string) {
 function KpiCard({
   label,
   value,
-  hint,
+  secondary,
   icon,
-  tone,
+  accent,
   compactValue,
+  trend,
+  spark,
+  alert,
 }: {
   label: string;
   value: string;
-  hint: string;
+  secondary?: string;
   icon: React.ReactNode;
-  tone: "primary" | "success" | "destructive" | "warning";
+  accent: "blue" | "rose" | "emerald" | "amber" | "indigo";
   compactValue?: boolean;
+  trend?:
+    | (Trend & { suffix?: string; goodWhen: "up" | "down"; asAbsolute?: boolean })
+    | null;
+  spark?: number[];
+  alert?: boolean;
 }) {
-  const toneMap: Record<typeof tone, string> = {
-    primary: "bg-primary/10 text-primary",
-    success: "bg-success/10 text-success",
-    destructive: "bg-destructive/10 text-destructive",
-    warning: "bg-warning/15 text-warning",
-  };
+  const accentMap = {
+    blue: { chip: "bg-blue-50 text-blue-600", label: "text-blue-600", spark: "#3b82f6", border: "border-blue-100", alert: "border-b-4 border-b-blue-500" },
+    rose: { chip: "bg-rose-50 text-rose-600", label: "text-rose-600", spark: "#f43f5e", border: "border-rose-100", alert: "border-b-4 border-b-rose-500" },
+    emerald: { chip: "bg-emerald-50 text-emerald-600", label: "text-emerald-600", spark: "#10b981", border: "border-emerald-100", alert: "border-b-4 border-b-emerald-500" },
+    amber: { chip: "bg-amber-50 text-amber-600", label: "text-amber-600", spark: "#f59e0b", border: "border-amber-100", alert: "border-b-4 border-b-amber-500" },
+    indigo: { chip: "bg-indigo-50 text-indigo-600", label: "text-indigo-600", spark: "#6366f1", border: "border-indigo-100", alert: "border-b-4 border-b-indigo-500" },
+  }[accent];
+
+  const trendChip = trend ? renderTrendChip(trend) : null;
+
   return (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm text-muted-foreground">{label}</p>
-            <p
-              className={`mt-1 font-semibold tracking-tight text-foreground ${
-                compactValue ? "text-lg leading-snug" : "text-3xl"
-              }`}
-            >
-              {value}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
-          </div>
-          <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${toneMap[tone]}`}>
-            {icon}
-          </div>
+    <div
+      className={`relative overflow-hidden rounded-3xl border bg-card p-5 shadow-sm transition-all hover:shadow-md ${accentMap.border} ${
+        alert ? accentMap.alert : ""
+      }`}
+    >
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <span className={`text-[11px] font-bold uppercase tracking-wider ${accentMap.label}`}>
+          {label}
+        </span>
+        <div className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${accentMap.chip}`}>
+          {icon}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+      <div className="flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h3
+            className={`font-extrabold tracking-tight text-foreground ${
+              compactValue ? "truncate text-xl leading-tight" : "text-3xl"
+            }`}
+            title={compactValue ? value : undefined}
+          >
+            {value}
+          </h3>
+          {secondary && (
+            <p className="mt-1 truncate text-xs font-medium text-muted-foreground">{secondary}</p>
+          )}
+          {trendChip}
+        </div>
+        {spark && spark.length > 1 && (
+          <Sparkline values={spark} color={accentMap.spark} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function renderTrendChip(
+  trend: Trend & { suffix?: string; goodWhen: "up" | "down"; asAbsolute?: boolean },
+) {
+  const up = trend.deltaAbs >= 0;
+  const good = (up && trend.goodWhen === "up") || (!up && trend.goodWhen === "down");
+  const cls = good ? "text-emerald-600" : "text-rose-600";
+  const arrow = up ? "▲" : "▼";
+  const val = trend.asAbsolute
+    ? `${Math.abs(trend.deltaAbs).toFixed(1)}${trend.suffix ?? ""}`
+    : `${Math.abs(trend.deltaPct).toFixed(1)}%`;
+  return (
+    <div className={`mt-2 flex items-center gap-1 text-xs font-semibold ${cls}`}>
+      <span>{arrow}</span>
+      <span>{val}</span>
+      <span className="font-normal text-muted-foreground">vs. 1. Hälfte</span>
+    </div>
+  );
+}
+
+function Sparkline({ values, color }: { values: number[]; color: string }) {
+  const w = 96;
+  const h = 36;
+  const max = Math.max(...values, 1);
+  const min = Math.min(...values, 0);
+  const range = max - min || 1;
+  const step = values.length > 1 ? w / (values.length - 1) : w;
+  const pts = values.map((v, i) => {
+    const x = i * step;
+    const y = h - ((v - min) / range) * h;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const line = `M ${pts.join(" L ")}`;
+  const area = `${line} L ${w},${h} L 0,${h} Z`;
+  const gradId = `g-${color.replace("#", "")}`;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="h-10 w-24 shrink-0">
+      <defs>
+        <linearGradient id={gradId} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.25" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gradId})`} />
+      <path d={line} fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
