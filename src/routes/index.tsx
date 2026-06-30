@@ -321,30 +321,30 @@ function Index() {
           <KpiCard
             label="Stornoquote"
             value={`${kpis.cancellationRate.toFixed(1)}%`}
-            hint={`${kpis.abgesagt} abgesagte Termine`}
+            secondary={`${kpis.abgesagt} abgesagte Termine`}
             icon={<TrendingDown className="h-5 w-5" />}
-            tone="warning"
+            accent="amber"
           />
           <KpiCard
             label="Ø Behandlungsdauer"
             value={`${kpis.durchschnittDauer.toFixed(0)} min`}
-            hint="je wahrgenommenem Termin"
+            secondary="je wahrgenommenem Termin"
             icon={<Clock className="h-5 w-5" />}
-            tone="success"
+            accent="emerald"
           />
           <KpiCard
             label="Neupatienten-Anteil"
             value={`${kpis.neupatientenAnteil.toFixed(1)}%`}
-            hint="aller Termine im Filter"
+            secondary="aller Termine im Filter"
             icon={<UserPlus className="h-5 w-5" />}
-            tone="success"
+            accent="emerald"
           />
           <KpiCard
             label="Geleistete Stunden"
             value={`${(kpis.geleisteteMinuten / 60).toFixed(1)} h`}
-            hint="Summe wahrgenommener Termine"
+            secondary="Summe wahrgenommener Termine"
             icon={<Activity className="h-5 w-5" />}
-            tone="primary"
+            accent="blue"
           />
         </div>
 
