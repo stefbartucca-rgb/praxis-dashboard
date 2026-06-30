@@ -215,3 +215,113 @@ export function groupByDoctor(items: Appointment[]) {
     }))
     .sort((a, b) => b.count - a.count);
 }
+
+// ------------------------------------------------------------------
+// Trend & sparkline helpers (für die KPI-Karten)
+// ------------------------------------------------------------------
+
+export type KpiKind =
+  | "total"
+  | "noShowRate"
+  | "auslastung"
+  | "topTreatment"
+  | "topWeekday";
+
+function dayKey(d: Date) {
+  return `${d.getFullYear()}-${(d.getMonth() + 1)
+    .toString()
+    .padStart(2, "0")}-${d.getDate().toString().padStart(2, "0")}`;
+}
+
+export function dailySeries(items: Appointment[], von: string, bis: string) {
+  const start = new Date(von + "T00:00:00");
+  const end = new Date(bis + "T00:00:00");
+  const map = new Map<string, number>();
+  const cur = new Date(start);
+  while (cur <= end) {
+    map.set(dayKey(cur), 0);
+    cur.setDate(cur.getDate() + 1);
+  }
+  items.forEach((a) => {
+    const k = dayKey(a.dateObj);
+    if (map.has(k)) map.set(k, (map.get(k) ?? 0) + 1);
+  });
+  return Array.from(map.values());
+}
+
+export function dailyNoShowRate(items: Appointment[], von: string, bis: string) {
+  const start = new Date(von + "T00:00:00");
+  const end = new Date(bis + "T00:00:00");
+  const totals = new Map<string, { t: number; n: number }>();
+  const cur = new Date(start);
+  while (cur <= end) {
+    totals.set(dayKey(cur), { t: 0, n: 0 });
+    cur.setDate(cur.getDate() + 1);
+  }
+  items.forEach((a) => {
+    const k = dayKey(a.dateObj);
+    const v = totals.get(k);
+    if (!v) return;
+    v.t++;
+    if (a.status === "no_show") v.n++;
+  });
+  return Array.from(totals.values()).map((v) => (v.t ? (v.n / v.t) * 100 : 0));
+}
+
+export interface Trend {
+  first: number;
+  second: number;
+  deltaAbs: number;
+  deltaPct: number; // relativ zum ersten Wert
+}
+
+function splitHalf(items: Appointment[], von: string, bis: string) {
+  const start = new Date(von + "T00:00:00").getTime();
+  const end = new Date(bis + "T23:59:59").getTime();
+  const mid = start + (end - start) / 2;
+  const first: Appointment[] = [];
+  const second: Appointment[] = [];
+  items.forEach((a) => {
+    if (a.dateObj.getTime() <= mid) first.push(a);
+    else second.push(a);
+  });
+  return { first, second };
+}
+
+function trendFromHalves(firstVal: number, secondVal: number): Trend {
+  const deltaAbs = secondVal - firstVal;
+  const deltaPct = firstVal !== 0 ? (deltaAbs / firstVal) * 100 : 0;
+  return { first: firstVal, second: secondVal, deltaAbs, deltaPct };
+}
+
+export function computeTotalTrend(items: Appointment[], von: string, bis: string): Trend {
+  const { first, second } = splitHalf(items, von, bis);
+  return trendFromHalves(first.length, second.length);
+}
+
+export function computeNoShowTrend(items: Appointment[], von: string, bis: string): Trend {
+  const { first, second } = splitHalf(items, von, bis);
+  const rate = (xs: Appointment[]) =>
+    xs.length ? (xs.filter((a) => a.status === "no_show").length / xs.length) * 100 : 0;
+  return trendFromHalves(rate(first), rate(second));
+}
+
+export function computeAuslastungTrend(
+  items: Appointment[],
+  von: string,
+  bis: string,
+  doctors: number,
+): Trend {
+  const start = new Date(von + "T00:00:00");
+  const end = new Date(bis + "T00:00:00");
+  const midDate = new Date(start.getTime() + (end.getTime() - start.getTime()) / 2);
+  const midIso = midDate.toISOString().slice(0, 10);
+  const { first, second } = splitHalf(items, von, bis);
+  const minutes = (xs: Appointment[]) =>
+    xs.filter((a) => a.status === "wahrgenommen").reduce((s, a) => s + (a.dauer_minuten || 0), 0);
+  const capFirst = computeCapacity(von, midIso, doctors);
+  const capSecond = computeCapacity(midIso, bis, doctors);
+  const r1 = capFirst.totalMinutes ? (minutes(first) / capFirst.totalMinutes) * 100 : 0;
+  const r2 = capSecond.totalMinutes ? (minutes(second) / capSecond.totalMinutes) * 100 : 0;
+  return trendFromHalves(r1, r2);
+}
